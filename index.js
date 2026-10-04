@@ -6,9 +6,7 @@ const webAppUrl = 'https://airdropnewmera.vercel.app/';
 const botUsername = 'USDTGalaxyProRobot'; 
 const adminId = 7813148563; 
 
-// Channels
-const mandatoryChannel = '@AirdropFindTeam'; 
-const paymentChannel = '@usdt_GalaxyPayments'; // Naya Payment Channel
+const paymentChannel = '@usdt_GalaxyPayments'; 
 
 const bot = new TelegramBot(token, {polling: true});
 
@@ -24,22 +22,8 @@ const mainMenu = {
     }
 };
 
-// Function: Channel Membership Check
-async function checkMembership(userId) {
-    try {
-        const chatMember = await bot.getChatMember(mandatoryChannel, userId);
-        if (['member', 'administrator', 'creator'].includes(chatMember.status)) {
-            return true;
-        }
-        return false;
-    } catch (error) {
-        console.log("Error checking membership. Make sure Bot is admin in the channel.");
-        return false;
-    }
-}
-
-// Start Command Handling
-bot.onText(/\/start(.*)/, async (msg, match) => {
+// Start Command Handling (Direct Main Menu, No Check)
+bot.onText(/\/start(.*)/, (msg, match) => {
     const chatId = msg.chat.id;
     const userId = msg.from.id;
     const userName = msg.from.first_name;
@@ -49,43 +33,12 @@ bot.onText(/\/start(.*)/, async (msg, match) => {
         bot.sendMessage(chatId, `✨ Welcome aboard! Invited by ID: ${refParam}`);
     }
 
-    const isMember = await checkMembership(userId);
-
-    if (isMember) {
-        bot.sendMessage(chatId, `🚀 **Welcome to USDT Galaxy, ${userName}!**\n\nYour account is active. Use the terminal below to navigate your dashboard.`, { parse_mode: "Markdown", ...mainMenu });
-    } else {
-        const joinMenu = {
-            reply_markup: {
-                inline_keyboard: [
-                    [{ text: "📢 Join Galaxy Channel", url: `https://t.me/${mandatoryChannel.replace('@', '')}` }],
-                    [{ text: "✅ I Have Joined", callback_data: "check_join" }]
-                ]
-            }
-        };
-        bot.sendMessage(chatId, `🛑 **Access Denied**\n\nHello ${userName}, you must join our official channel to use this bot and earn USDT.\n\n1️⃣ Join ${mandatoryChannel}\n2️⃣ Click 'I Have Joined' to verify.`, { parse_mode: "Markdown", ...joinMenu });
-    }
+    // Direct welcome message bina kisi check ke
+    bot.sendMessage(chatId, `🚀 **Welcome to USDT Galaxy, ${userName}!**\n\nYour account is active. Use the terminal below to navigate your dashboard.`, { parse_mode: "Markdown", ...mainMenu });
 });
 
-// Inline Button (Verify Join)
-bot.on('callback_query', async (query) => {
-    const chatId = query.message.chat.id;
-    const userId = query.from.id;
-    const messageId = query.message.message_id;
-
-    if (query.data === 'check_join') {
-        const isMember = await checkMembership(userId);
-        
-        if (isMember) {
-            bot.deleteMessage(chatId, messageId);
-            bot.sendMessage(chatId, `✅ **Verification Successful!**\n\nWelcome to USDT Galaxy! Your dashboard is now unlocked.`, { parse_mode: "Markdown", ...mainMenu });
-        } else {
-            bot.answerCallbackQuery(query.id, { text: "❌ You haven't joined the channel yet!", show_alert: true });
-        }
-    }
-});
-
-// Main Menu Button Clicks
-bot.on('message', async (msg) => {
+// Main Menu Button Clicks (No Check)
+bot.on('message', (msg) => {
     const chatId = msg.chat.id;
     const text = msg.text;
     const userId = msg.from.id;
@@ -93,13 +46,7 @@ bot.on('message', async (msg) => {
     if (!text || text.startsWith('/start')) return;
 
     if (text === '/admin' && userId === adminId) {
-        bot.sendMessage(chatId, `🛠 **Admin Panel:**\nBot is running perfectly!\nMain Channel: ${mandatoryChannel}\nPayment Channel:${paymentChannel}`);
-        return;
-    }
-
-    const isMember = await checkMembership(userId);
-    if (!isMember) {
-        bot.sendMessage(chatId, `⚠️ You left the channel! Please join ${mandatoryChannel} to continue earning.`);
+        bot.sendMessage(chatId, `🛠 **Admin Panel:**\nBot is running perfectly!\nForce Subscribe is currently OFF.`);
         return;
     }
 
@@ -111,7 +58,6 @@ bot.on('message', async (msg) => {
         bot.sendMessage(chatId, `🛸 **Recruit & Earn**\n\nBuild your crew! Earn **100 GALAXY ($0.01 USDT)** for every valid recruit.\n\n🚀 Your Transmission Link:\n\`${refLink}\``, { parse_mode: "Markdown" });
     }
     else if (text === "💳 Payout (USDT)") {
-        // Yahan payment channel add kar diya gaya hai
         bot.sendMessage(chatId, `🏦 **USDT Treasury (BEP-20)**\n\n🔒 **Threshold:** 700 GALAXY ($0.07 USDT)\n\nYou need 200 more GALAXY to unlock the withdrawal portal.\n\n🧾 **Live Payout Proofs:** ${paymentChannel}`);
     }
     else if (text === "🎬 Watch & Earn") {
@@ -126,5 +72,4 @@ bot.on('message', async (msg) => {
     }
 });
 
-console.log("USDT Galaxy Bot is running...");
-          
+console.log("USDT Galaxy Bot is running (Channel Check OFF)...");
