@@ -1,0 +1,12 @@
+{
+  "name": "usdt-galaxy-bot",
+  "version": "1.0.0",
+  "description": "Telegram Bot for USDT Galaxy",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "node-telegram-bot-api": "^0.66.0"
+  }
+}
