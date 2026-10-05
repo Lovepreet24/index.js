@@ -1,7 +1,6 @@
 {
   "name": "galaxy-bot",
-  "version": "2.0.0",
-  "description": "USDT Galaxy Telegram Bot",
+  "version": "3.0.0",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
