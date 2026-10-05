@@ -23,12 +23,51 @@ const BACKEND_URL =
   process.env.BACKEND_URL ||
   "https://usdtbot-production-89e9.up.railway.app";
 
-const STARTING_BALANCE = 500;
-const EARN_AMOUNT = 100;
+// Admin secret for manually processing withdrawals.
+// Add ADMIN_SECRET in Railway Variables.
+const ADMIN_SECRET =
+  process.env.ADMIN_SECRET;
 
-// Telegram channel usernames
+// ==================================================
+// REWARDS
+// ==================================================
+
+const STARTING_BALANCE = 500; // 500 GALAXY = $0.05 USDT
+const REFERRAL_REWARD = 100;  // 100 GALAXY = $0.01 USDT
+const EARN_AMOUNT = 100;      // 100 GALAXY = $0.01 USDT
+const MIN_WITHDRAWAL = 700;   // 700 GALAXY = $0.07 USDT
+
+const TASK_COOLDOWN_MS =
+  24 * 60 * 60 * 1000;
+
+// ==================================================
+// TELEGRAM CHANNELS
+// ==================================================
+
 const MAIN_CHANNEL = "@USDTGalaxyOfficial";
 const PAYMENT_CHANNEL = "@usdt_GalaxyPayments";
+
+// ==================================================
+// YOUTUBE TASKS
+// ==================================================
+
+const YOUTUBE_TASKS = [
+  {
+    id: "video1",
+    url: "https://youtu.be/unTAEBvggus",
+    reward: EARN_AMOUNT
+  },
+  {
+    id: "video2",
+    url: "https://youtu.be/Hja_iwEkfmI",
+    reward: EARN_AMOUNT
+  },
+  {
+    id: "video3",
+    url: "https://youtu.be/I5mLBbsuAdA",
+    reward: EARN_AMOUNT
+  }
+];
 
 // ==================================================
 // CONFIG CHECK
@@ -44,6 +83,12 @@ if (!SUPABASE_SERVICE_ROLE_KEY) {
   process.exit(1);
 }
 
+if (!ADMIN_SECRET) {
+  console.warn(
+    "⚠️ ADMIN_SECRET missing. Admin payout endpoint will be disabled."
+  );
+}
+
 console.log("🌌 USDT Galaxy starting...");
 
 // ==================================================
@@ -57,27 +102,35 @@ const bot = new TelegramBot(BOT_TOKEN);
 // ==================================================
 
 async function supabaseRequest(path, options = {}) {
-  const response = await fetch(`${SUPABASE_URL}${path}`, {
-    ...options,
+  const response = await fetch(
+    `${SUPABASE_URL}${path}`,
+    {
+      ...options,
 
-    headers: {
-      apikey: SUPABASE_SERVICE_ROLE_KEY,
+      headers: {
+        apikey: SUPABASE_SERVICE_ROLE_KEY,
 
-      Authorization:
-        `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+        Authorization:
+          `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
 
-      "Content-Type": "application/json",
+        "Content-Type":
+          "application/json",
 
-      ...(options.headers || {})
+        ...(options.headers || {})
+      }
     }
-  });
+  );
 
-  const text = await response.text();
+  const text =
+    await response.text();
 
   let data = null;
 
   try {
-    data = text ? JSON.parse(text) : null;
+    data =
+      text
+        ? JSON.parse(text)
+        : null;
   } catch {
     data = text;
   }
@@ -102,11 +155,12 @@ async function supabaseRequest(path, options = {}) {
 // ==================================================
 
 async function getUser(chatId) {
-  const data = await supabaseRequest(
-    `/rest/v1/users?chat_id=eq.${encodeURIComponent(
-      chatId
-    )}&select=*`
-  );
+  const data =
+    await supabaseRequest(
+      `/rest/v1/users?chat_id=eq.${encodeURIComponent(
+        chatId
+      )}&select=*`
+    );
 
   return data && data.length
     ? data[0]
@@ -114,37 +168,49 @@ async function getUser(chatId) {
 }
 
 // ==================================================
-// CREATE USER
+// REGISTER USER
+//
+// New user gets 500 GALAXY.
+// If referral is valid, referrer gets 100 GALAXY.
 // ==================================================
 
-async function createUser(chatId) {
+async function registerUser(
+  chatId,
+  referrerId = null
+) {
   try {
-    const data = await supabaseRequest(
-      "/rest/v1/users",
-      {
-        method: "POST",
+    const result =
+      await supabaseRequest(
+        "/rest/v1/rpc/register_user",
+        {
+          method: "POST",
 
-        headers: {
-          Prefer: "return=representation"
-        },
+          body: JSON.stringify({
+            p_chat_id: chatId,
+            p_referrer_id:
+              referrerId
+                ? String(referrerId)
+                : null
+          })
+        }
+      );
 
-        body: JSON.stringify({
-          chat_id: chatId,
-          balance: STARTING_BALANCE
-        })
-      }
-    );
+    if (
+      Array.isArray(result) &&
+      result.length
+    ) {
+      return result[0];
+    }
 
-    return data && data.length
-      ? data[0]
-      : null;
+    return result;
 
   } catch (error) {
     console.error(
-      "Create user error:",
+      "Register user error:",
       error
     );
 
+    // If already exists, simply return existing user.
     return await getUser(chatId);
   }
 }
@@ -154,10 +220,15 @@ async function createUser(chatId) {
 // ==================================================
 
 async function ensureUser(chatId) {
-  let user = await getUser(chatId);
+  let user =
+    await getUser(chatId);
 
   if (!user) {
-    user = await createUser(chatId);
+    user =
+      await registerUser(
+        chatId,
+        null
+      );
   }
 
   return user;
@@ -167,7 +238,9 @@ async function ensureUser(chatId) {
 // VERIFY TELEGRAM INIT DATA
 // ==================================================
 
-function verifyTelegramInitData(initData) {
+function verifyTelegramInitData(
+  initData
+) {
   if (
     !initData ||
     typeof initData !== "string"
@@ -180,9 +253,10 @@ function verifyTelegramInitData(initData) {
   }
 
   try {
-    const params = new URLSearchParams(
-      initData
-    );
+    const params =
+      new URLSearchParams(
+        initData
+      );
 
     const receivedHash =
       params.get("hash");
@@ -237,9 +311,10 @@ function verifyTelegramInitData(initData) {
       return null;
     }
 
-    const authDate = Number(
-      params.get("auth_date")
-    );
+    const authDate =
+      Number(
+        params.get("auth_date")
+      );
 
     if (!authDate) {
       console.error(
@@ -250,8 +325,9 @@ function verifyTelegramInitData(initData) {
     }
 
     const age =
-      Math.floor(Date.now() / 1000) -
-      authDate;
+      Math.floor(
+        Date.now() / 1000
+      ) - authDate;
 
     if (
       age < 0 ||
@@ -317,11 +393,6 @@ async function checkChannel(
         telegramUserId
       );
 
-    console.log(
-      `📡 Telegram response ${channelUsername}:`,
-      JSON.stringify(member)
-    );
-
     const status =
       member?.status;
 
@@ -336,7 +407,8 @@ async function checkChannel(
 
     return {
       joined,
-      status: status || "unknown",
+      status:
+        status || "unknown",
       error: null
     };
 
@@ -379,15 +451,6 @@ async function verifyChannels(
     main.joined &&
     payments.joined;
 
-  console.log(
-    `📊 Channel verification for ${telegramUserId}:`,
-    JSON.stringify({
-      joined,
-      main,
-      payments
-    })
-  );
-
   return {
     joined,
     main,
@@ -397,20 +460,62 @@ async function verifyChannels(
 
 // ==================================================
 // /START
-// BOT DOES ONLY ONE THING:
-// OPEN MINI APP
 // ==================================================
 
 async function handleStart(msg) {
-  const chatId = msg.chat.id;
+  const chatId =
+    msg.chat.id.toString();
 
   console.log(
     `📲 /start from ${chatId}`
   );
 
-  await ensureUser(
-    chatId.toString()
-  );
+  // /start REFERRER_ID
+  const text =
+    msg.text || "";
+
+  const parts =
+    text.trim().split(/\s+/);
+
+  let referrerId = null;
+
+  if (
+    parts.length >= 2 &&
+    /^\d+$/.test(parts[1])
+  ) {
+    referrerId =
+      parts[1];
+
+    if (
+      referrerId === chatId
+    ) {
+      referrerId = null;
+    }
+  }
+
+  const existingUser =
+    await getUser(chatId);
+
+  if (!existingUser) {
+    await registerUser(
+      chatId,
+      referrerId
+    );
+
+    console.log(
+      `🎁 New user ${chatId} registered with 500 GALAXY`
+    );
+
+    if (referrerId) {
+      console.log(
+        `👥 Referral candidate: ${referrerId}`
+      );
+    }
+  } else {
+    console.log(
+      `👤 Existing user ${chatId}`
+    );
+  }
 
   await bot.sendMessage(
     chatId,
@@ -428,7 +533,8 @@ async function handleStart(msg) {
                 "🚀 Open USDT Galaxy",
 
               web_app: {
-                url: WEB_APP_URL
+                url:
+                  WEB_APP_URL
               }
             }
           ]
@@ -450,7 +556,8 @@ function readBody(req) {
       req.on(
         "data",
         chunk => {
-          body += chunk.toString();
+          body +=
+            chunk.toString();
         }
       );
 
@@ -489,6 +596,25 @@ function sendJson(
   res.end(
     JSON.stringify(data)
   );
+}
+
+// ==================================================
+// AUTH HELPER
+// ==================================================
+
+async function authenticate(
+  parsed
+) {
+  const telegramUser =
+    verifyTelegramInitData(
+      parsed?.initData
+    );
+
+  if (!telegramUser) {
+    return null;
+  }
+
+  return telegramUser;
 }
 
 // ==================================================
@@ -562,7 +688,8 @@ const server =
 
         if (
           req.method === "POST" &&
-          req.url === `/bot${BOT_TOKEN}`
+          req.url ===
+            `/bot${BOT_TOKEN}`
         ) {
 
           const body =
@@ -608,16 +735,9 @@ const server =
 
         if (
           req.method === "POST" &&
-          req.url === "/verify-channels"
+          req.url ===
+            "/verify-channels"
         ) {
-
-          console.log(
-            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-          );
-
-          console.log(
-            "🔐 VERIFY-CHANNELS REQUEST"
-          );
 
           const body =
             await readBody(req);
@@ -641,24 +761,12 @@ const server =
             return;
           }
 
-          console.log(
-            "📦 initData received:",
-            Boolean(
-              parsed?.initData
-            )
-          );
-
           const telegramUser =
-            verifyTelegramInitData(
-              parsed?.initData
+            await authenticate(
+              parsed
             );
 
           if (!telegramUser) {
-
-            console.error(
-              "❌ VERIFY FAILED: invalid Telegram session"
-            );
-
             sendJson(
               res,
               401,
@@ -675,18 +783,10 @@ const server =
           const chatId =
             telegramUser.id.toString();
 
-          console.log(
-            `👤 Telegram user: ${chatId}`
-          );
-
           const result =
             await verifyChannels(
               chatId
             );
-
-          console.log(
-            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-          );
 
           sendJson(
             res,
@@ -756,8 +856,8 @@ const server =
           }
 
           const telegramUser =
-            verifyTelegramInitData(
-              parsed?.initData
+            await authenticate(
+              parsed
             );
 
           if (!telegramUser) {
@@ -788,9 +888,86 @@ const server =
             );
           }
 
-          console.log(
-            `✅ Sync user ${chatId} balance ${user.balance}`
-          );
+          // Get task cooldown information
+          const claims =
+            await supabaseRequest(
+              `/rest/v1/task_claims?chat_id=eq.${encodeURIComponent(
+                chatId
+              )}&select=task_id,claimed_at`
+            );
+
+          const now =
+            Date.now();
+
+          const tasks =
+            YOUTUBE_TASKS.map(
+              task => {
+
+                const claim =
+                  Array.isArray(claims)
+                    ? claims.find(
+                        x =>
+                          x.task_id ===
+                          task.id
+                      )
+                    : null;
+
+                let available = true;
+                let nextAvailableAt = null;
+                let remainingSeconds = 0;
+
+                if (claim?.claimed_at) {
+                  const claimedTime =
+                    new Date(
+                      claim.claimed_at
+                    ).getTime();
+
+                  const nextTime =
+                    claimedTime +
+                    TASK_COOLDOWN_MS;
+
+                  if (
+                    now <
+                    nextTime
+                  ) {
+                    available = false;
+                    nextAvailableAt =
+                      new Date(
+                        nextTime
+                      ).toISOString();
+
+                    remainingSeconds =
+                      Math.ceil(
+                        (
+                          nextTime -
+                          now
+                        ) / 1000
+                      );
+                  }
+                }
+
+                return {
+                  id:
+                    task.id,
+
+                  url:
+                    task.url,
+
+                  reward:
+                    task.reward,
+
+                  usdt:
+                    task.reward /
+                    10000,
+
+                  available,
+
+                  nextAvailableAt,
+
+                  remainingSeconds
+                };
+              }
+            );
 
           sendJson(
             res,
@@ -801,7 +978,36 @@ const server =
               balance:
                 Number(
                   user.balance || 0
-                )
+                ),
+
+              referrals:
+                Number(
+                  user.referral_count ||
+                    0
+                ),
+
+              referralReward:
+                REFERRAL_REWARD,
+
+              referralRewardUsdt:
+                REFERRAL_REWARD /
+                10000,
+
+              joiningBonus:
+                STARTING_BALANCE,
+
+              joiningBonusUsdt:
+                STARTING_BALANCE /
+                10000,
+
+              minWithdrawal:
+                MIN_WITHDRAWAL,
+
+              minWithdrawalUsdt:
+                MIN_WITHDRAWAL /
+                10000,
+
+              tasks
             }
           );
 
@@ -809,7 +1015,8 @@ const server =
         }
 
         // ==============================================
-        // EARN
+        // EARN YOUTUBE TASK
+        // 24 HOUR SERVER-SIDE COOLDOWN
         // ==============================================
 
         if (
@@ -840,8 +1047,8 @@ const server =
           }
 
           const telegramUser =
-            verifyTelegramInitData(
-              parsed?.initData
+            await authenticate(
+              parsed
             );
 
           if (!telegramUser) {
@@ -858,17 +1065,14 @@ const server =
             return;
           }
 
-          const allowedTasks = [
-            "video1",
-            "video2",
-            "video3"
-          ];
+          const task =
+            YOUTUBE_TASKS.find(
+              x =>
+                x.id ===
+                parsed?.taskId
+            );
 
-          if (
-            !allowedTasks.includes(
-              parsed?.taskId
-            )
-          ) {
+          if (!task) {
             sendJson(
               res,
               400,
@@ -885,14 +1089,13 @@ const server =
           const chatId =
             telegramUser.id.toString();
 
-          // Check channel membership
+          // Check channels
           const channels =
             await verifyChannels(
               chatId
             );
 
           if (!channels.joined) {
-
             sendJson(
               res,
               403,
@@ -916,9 +1119,234 @@ const server =
             chatId
           );
 
+          // Atomic 24-hour task claim
           const result =
             await supabaseRequest(
-              "/rest/v1/rpc/increment_user_balance",
+              "/rest/v1/rpc/claim_youtube_task",
+              {
+                method: "POST",
+
+                body:
+                  JSON.stringify({
+                    p_chat_id:
+                      chatId,
+
+                    p_task_id:
+                      task.id,
+
+                    p_reward:
+                      task.reward
+                  })
+              }
+            );
+
+          const claimResult =
+            Array.isArray(result)
+              ? result[0]
+              : result;
+
+          if (
+            !claimResult ||
+            claimResult.success !== true
+          ) {
+
+            sendJson(
+              res,
+              429,
+              {
+                success: false,
+
+                error:
+                  "TASK_COOLDOWN",
+
+                message:
+                  "This task will be available again after 24 hours.",
+
+                nextAvailableAt:
+                  claimResult?.next_available_at ||
+                  null,
+
+                remainingSeconds:
+                  Number(
+                    claimResult?.remaining_seconds ||
+                      0
+                  )
+              }
+            );
+
+            return;
+          }
+
+          sendJson(
+            res,
+            200,
+            {
+              success: true,
+
+              balance:
+                Number(
+                  claimResult.balance
+                ),
+
+              earned:
+                task.reward,
+
+              usdt:
+                task.reward /
+                10000,
+
+              nextAvailableAt:
+                claimResult.next_available_at
+            }
+          );
+
+          console.log(
+            `💰 ${chatId} earned ${task.reward} GALAXY from ${task.id}`
+          );
+
+          return;
+        }
+
+        // ==============================================
+        // CREATE WITHDRAWAL
+        // ==============================================
+
+        if (
+          req.method === "POST" &&
+          req.url === "/payout"
+        ) {
+
+          const body =
+            await readBody(req);
+
+          let parsed;
+
+          try {
+            parsed =
+              JSON.parse(body);
+          } catch {
+            sendJson(
+              res,
+              400,
+              {
+                success: false,
+                error:
+                  "INVALID_JSON"
+              }
+            );
+
+            return;
+          }
+
+          const telegramUser =
+            await authenticate(
+              parsed
+            );
+
+          if (!telegramUser) {
+            sendJson(
+              res,
+              401,
+              {
+                success: false,
+                error:
+                  "INVALID_TELEGRAM_SESSION"
+              }
+            );
+
+            return;
+          }
+
+          const amount =
+            Number(
+              parsed.amount
+            );
+
+          const wallet =
+            String(
+              parsed.wallet || ""
+            ).trim();
+
+          if (
+            !Number.isInteger(
+              amount
+            )
+          ) {
+            sendJson(
+              res,
+              400,
+              {
+                success: false,
+                error:
+                  "INVALID_AMOUNT"
+              }
+            );
+
+            return;
+          }
+
+          if (
+            amount <
+            MIN_WITHDRAWAL
+          ) {
+            sendJson(
+              res,
+              400,
+              {
+                success: false,
+
+                error:
+                  "MIN_WITHDRAWAL",
+
+                minimum:
+                  MIN_WITHDRAWAL,
+
+                minimumUsdt:
+                  MIN_WITHDRAWAL /
+                  10000
+              }
+            );
+
+            return;
+          }
+
+          if (!wallet) {
+            sendJson(
+              res,
+              400,
+              {
+                success: false,
+                error:
+                  "WALLET_REQUIRED"
+              }
+            );
+
+            return;
+          }
+
+          if (
+            wallet.length < 10 ||
+            wallet.length > 150
+          ) {
+            sendJson(
+              res,
+              400,
+              {
+                success: false,
+                error:
+                  "INVALID_WALLET"
+              }
+            );
+
+            return;
+          }
+
+          const chatId =
+            telegramUser.id.toString();
+
+          const result =
+            await supabaseRequest(
+              "/rest/v1/rpc/create_manual_payout",
               {
                 method: "POST",
 
@@ -928,17 +1356,45 @@ const server =
                       chatId,
 
                     p_amount:
-                      EARN_AMOUNT
+                      amount,
+
+                    p_wallet:
+                      wallet
                   })
               }
             );
 
-          const newBalance =
-            Number(result);
+          const payout =
+            Array.isArray(result)
+              ? result[0]
+              : result;
 
-          console.log(
-            `💰 Earn ${chatId}: +${EARN_AMOUNT}, balance ${newBalance}`
-          );
+          if (
+            !payout ||
+            payout.success !== true
+          ) {
+            const errorCode =
+              payout?.error ||
+              "PAYOUT_FAILED";
+
+            const status =
+              errorCode ===
+              "INSUFFICIENT_BALANCE"
+                ? 400
+                : 400;
+
+            sendJson(
+              res,
+              status,
+              {
+                success: false,
+                error:
+                  errorCode
+              }
+            );
+
+            return;
+          }
 
           sendJson(
             res,
@@ -946,12 +1402,283 @@ const server =
             {
               success: true,
 
-              balance:
-                newBalance,
+              payoutId:
+                payout.payout_id,
 
-              earned:
-                EARN_AMOUNT
+              balance:
+                Number(
+                  payout.balance
+                ),
+
+              amount,
+
+              usdt:
+                amount /
+                10000,
+
+              status:
+                "pending"
             }
+          );
+
+          console.log(
+            `💸 Withdrawal created: ${chatId} | ${amount} GALAXY | ${wallet}`
+          );
+
+          return;
+        }
+
+        // ==============================================
+        // USER PAYOUT HISTORY
+        // ==============================================
+
+        if (
+          req.method === "POST" &&
+          req.url === "/payouts"
+        ) {
+
+          const body =
+            await readBody(req);
+
+          let parsed;
+
+          try {
+            parsed =
+              JSON.parse(body);
+          } catch {
+            sendJson(
+              res,
+              400,
+              {
+                success: false,
+                error:
+                  "INVALID_JSON"
+              }
+            );
+
+            return;
+          }
+
+          const telegramUser =
+            await authenticate(
+              parsed
+            );
+
+          if (!telegramUser) {
+            sendJson(
+              res,
+              401,
+              {
+                success: false,
+                error:
+                  "INVALID_TELEGRAM_SESSION"
+              }
+            );
+
+            return;
+          }
+
+          const chatId =
+            telegramUser.id.toString();
+
+          const payouts =
+            await supabaseRequest(
+              `/rest/v1/payouts?chat_id=eq.${encodeURIComponent(
+                chatId
+              )}&select=id,amount,wallet,status,created_at,processed_at&order=created_at.desc&limit=50`
+            );
+
+          sendJson(
+            res,
+            200,
+            {
+              success: true,
+
+              payouts:
+                (payouts || []).map(
+                  p => ({
+                    id: p.id,
+                    amount:
+                      Number(
+                        p.amount
+                      ),
+                    usdt:
+                      Number(
+                        p.amount
+                      ) / 10000,
+                    wallet:
+                      p.wallet,
+                    status:
+                      p.status,
+                    createdAt:
+                      p.created_at,
+                    processedAt:
+                      p.processed_at
+                  })
+                )
+            }
+          );
+
+          return;
+        }
+
+        // ==============================================
+        // ADMIN PAYOUT STATUS
+        //
+        // action:
+        // paid     = mark paid
+        // rejected = reject + refund balance
+        // ==============================================
+
+        if (
+          req.method === "POST" &&
+          req.url === "/admin/payout"
+        ) {
+
+          if (
+            !ADMIN_SECRET
+          ) {
+            sendJson(
+              res,
+              503,
+              {
+                success: false,
+                error:
+                  "ADMIN_SECRET_NOT_CONFIGURED"
+              }
+            );
+
+            return;
+          }
+
+          const body =
+            await readBody(req);
+
+          let parsed;
+
+          try {
+            parsed =
+              JSON.parse(body);
+          } catch {
+            sendJson(
+              res,
+              400,
+              {
+                success: false,
+                error:
+                  "INVALID_JSON"
+              }
+            );
+
+            return;
+          }
+
+          if (
+            parsed.adminSecret !==
+            ADMIN_SECRET
+          ) {
+            sendJson(
+              res,
+              403,
+              {
+                success: false,
+                error:
+                  "INVALID_ADMIN_SECRET"
+              }
+            );
+
+            return;
+          }
+
+          const payoutId =
+            String(
+              parsed.payoutId || ""
+            ).trim();
+
+          const action =
+            String(
+              parsed.action || ""
+            ).toLowerCase();
+
+          if (
+            !payoutId ||
+            ![
+              "paid",
+              "rejected"
+            ].includes(action)
+          ) {
+            sendJson(
+              res,
+              400,
+              {
+                success: false,
+                error:
+                  "INVALID_PAYOUT_ACTION"
+              }
+            );
+
+            return;
+          }
+
+          const result =
+            await supabaseRequest(
+              "/rest/v1/rpc/update_payout_status",
+              {
+                method: "POST",
+
+                body:
+                  JSON.stringify({
+                    p_payout_id:
+                      payoutId,
+
+                    p_status:
+                      action
+                  })
+              }
+            );
+
+          const output =
+            Array.isArray(result)
+              ? result[0]
+              : result;
+
+          if (
+            !output ||
+            output.success !== true
+          ) {
+            sendJson(
+              res,
+              400,
+              {
+                success: false,
+                error:
+                  output?.error ||
+                  "PAYOUT_UPDATE_FAILED"
+              }
+            );
+
+            return;
+          }
+
+          sendJson(
+            res,
+            200,
+            {
+              success: true,
+
+              payoutId,
+
+              status:
+                action,
+
+              refunded:
+                action ===
+                "rejected"
+            }
+          );
+
+          console.log(
+            `💳 Admin payout ${payoutId}: ${action}`
           );
 
           return;
@@ -965,8 +1692,9 @@ const server =
           res,
           404,
           {
+            success: false,
             error:
-              "Not Found"
+              "NOT_FOUND"
           }
         );
 
@@ -1031,6 +1759,31 @@ server.listen(
 
       console.log(
         `💳 Payment channel: ${PAYMENT_CHANNEL}`
+      );
+
+      console.log(
+        `🎁 Joining bonus: ${STARTING_BALANCE} GALAXY ($${(
+          STARTING_BALANCE /
+          10000
+        ).toFixed(2)} USDT)`
+      );
+
+      console.log(
+        `👥 Referral reward: ${REFERRAL_REWARD} GALAXY ($${(
+          REFERRAL_REWARD /
+          10000
+        ).toFixed(2)} USDT)`
+      );
+
+      console.log(
+        `💸 Minimum withdrawal: ${MIN_WITHDRAWAL} GALAXY ($${(
+          MIN_WITHDRAWAL /
+          10000
+        ).toFixed(2)} USDT)`
+      );
+
+      console.log(
+        "▶️ YouTube tasks reset every 24 hours"
       );
 
       console.log(
