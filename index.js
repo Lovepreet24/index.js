@@ -2,7 +2,7 @@ const TelegramBot = require('node-telegram-bot-api');
 const http = require('http');
 const mongoose = require('mongoose');
 
-// Aapka MongoDB Database Link
+// MongoDB Database Link
 const mongoURI = 'mongodb+srv://bhullar241:Lovepreet241@bhullar.jjzhl1x.mongodb.net/galaxybot?retryWrites=true&w=majority&appName=Bhullar';
 
 mongoose.connect(mongoURI)
@@ -15,13 +15,13 @@ const userSchema = new mongoose.Schema({
 });
 const User = mongoose.model('User', userSchema);
 
-// 👇 Yahan aapka NAYA TOKEN set kar diya hai 👇
-const token = '8368559467:AAEdHKIhvI10PyiwsQnMTU1aoDq4ND-KQ4g';
+// 👇 Yahan aapka naya token set kar diya hai 👇
+const token = '8301838001:AAEm96vzXmNzmy_QhTjAlhnFPWq4i1XZcsE';
 const webAppUrl = 'https://airdropnewmera.vercel.app/'; 
 const botUsername = 'USDTGalaxyProRobot'; 
 const paymentChannel = '@usdt_GalaxyPayments'; 
 
-const bot = new TelegramBot(token, {polling: true});
+const bot = new TelegramBot(token, { polling: true });
 
 function getMainMenu(userId) {
     return {
@@ -84,6 +84,12 @@ const server = http.createServer((req, res) => {
 
     if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return; }
 
+    if (req.url === '/' || req.url === '/health') {
+        res.writeHead(200, { 'Content-Type': 'text/plain' });
+        res.end('Bot is active and running!');
+        return;
+    }
+
     if (req.method === 'POST' && req.url === '/sync') {
         let body = '';
         req.on('data', chunk => { body += chunk.toString(); });
@@ -112,5 +118,5 @@ const server = http.createServer((req, res) => {
     }
 });
 
-const PORT = process.env.PORT || 8080;
-server.listen(PORT, () => { console.log(`Auto-Sync API Server running on port ${PORT}`); });
+const PORT = process.env.PORT || 10000;
+server.listen(PORT, () => { console.log(`Server running on port ${PORT}`); });
