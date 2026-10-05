@@ -11,11 +11,12 @@ const bot = new TelegramBot(token, {polling: true});
 // Har user ka balance store karne ke liye temporary memory
 const userBalances = {};
 
+// 🔴 YAHAN CHANGE KIYA HAI: 'Watch & Earn' me direct web_app laga diya gaya hai
 const mainMenu = {
     reply_markup: {
         keyboard: [
             [{ text: "🌌 My Profile" }, { text: "🛸 Invite Crew" }],
-            [{ text: "💳 Payout (USDT)" }, { text: "🎬 Watch & Earn" }]
+            [{ text: "💳 Payout (USDT)" }, { text: "🎬 Watch & Earn", web_app: { url: webAppUrl } }]
         ],
         resize_keyboard: true,
         is_persistent: true
@@ -26,7 +27,6 @@ bot.onText(/\/start(.*)/, (msg) => {
     const chatId = msg.chat.id;
     const userName = msg.from.first_name;
 
-    // Default balance 500 agar pehli baar aaya hai
     if (!userBalances[chatId]) {
         userBalances[chatId] = 500;
     }
@@ -34,15 +34,14 @@ bot.onText(/\/start(.*)/, (msg) => {
     bot.sendMessage(chatId, `🚀 **Welcome to USDT Galaxy, ${userName}!**\n\nYour account is active. Use the terminal below to navigate your dashboard.`, { parse_mode: "Markdown", ...mainMenu });
 });
 
-// Jab user mini app se balance sync karke wapas aayega
 bot.on('message', (msg) => {
     const chatId = msg.chat.id;
     const text = msg.text;
 
-    // Agar mini app se data aaya hai
+    // ✅ Jab Mini App se data aayega (Sync button dabane par)
     if (msg.web_app_data) {
         const newBalance = parseInt(msg.web_app_data.data);
-        userBalances[chatId] = newBalance; // Balance update ho gaya!
+        userBalances[chatId] = newBalance; 
         let usdtVal = (newBalance * 0.0001).toFixed(2);
         
         bot.sendMessage(chatId, `🎉 **Balance Synced Successfully!**\n\n🪙 New Balance: ${newBalance} GALAXY\n💵 USDT Value: ~$${usdtVal}`, { parse_mode: "Markdown", ...mainMenu });
@@ -51,7 +50,6 @@ bot.on('message', (msg) => {
 
     if (!text || text.startsWith('/start')) return;
 
-    // Current balance fetch karo
     let currentBal = userBalances[chatId] || 500;
     let usdtVal = (currentBal * 0.0001).toFixed(2);
 
@@ -65,16 +63,6 @@ bot.on('message', (msg) => {
     else if (text === "💳 Payout (USDT)") {
         bot.sendMessage(chatId, `🏦 **USDT Treasury (BEP-20)**\n\n🪙 Your Balance: ${currentBal} GALAXY\n🔒 **Threshold:** 700 GALAXY ($0.07 USDT)\n\n🧾 **Live Payout Proofs:** ${paymentChannel}`);
     }
-    else if (text === "🎬 Watch & Earn") {
-        const miniAppMenu = {
-            reply_markup: {
-                inline_keyboard: [
-                    [{ text: "▶️ Open Galaxy Studio", web_app: { url: webAppUrl } }]
-                ]
-            }
-        };
-        bot.sendMessage(chatId, `📺 **Earn Instant Crypto**\n\nWatch transmissions (ads) in our secure Mini App to collect GALAXY tokens.`, miniAppMenu);
-    }
 });
 
-console.log("USDT Galaxy Bot with Sync is running...");
+console.log("USDT Galaxy Bot is running with Direct Mini App...");
