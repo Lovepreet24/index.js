@@ -4,7 +4,6 @@ const mongoose = require('mongoose');
 
 // MongoDB Database Link
 const mongoURI = process.env.MONGO_URI || 'mongodb+srv://bhullar241:Lovepreet241@bhullar.jjzhl1x.mongodb.net/galaxybot?retryWrites=true&w=majority&appName=Bhullar';
-';
 
 mongoose.connect(mongoURI)
     .then(() => console.log('✅ MongoDB Connected! Database is Live.'))
