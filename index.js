@@ -198,17 +198,37 @@ function verifyTelegramInitData(initData) {
 
 // =========================
 // /START
-// ONLY MINI APP LAUNCHER
+// BOT ONLY OPENS MINI APP
 // =========================
 
 async function handleStart(msg) {
   const chatId = msg.chat.id.toString();
 
+  // Create account if first time
   await ensureUser(chatId);
 
+  // Remove old reply keyboard
+  try {
+    await bot.sendMessage(
+      chatId,
+      "🌌 USDT Galaxy",
+      {
+        reply_markup: {
+          remove_keyboard: true
+        }
+      }
+    );
+  } catch (error) {
+    console.error(
+      "Keyboard removal error:",
+      error
+    );
+  }
+
+  // Send ONLY Mini App launcher
   await bot.sendMessage(
     chatId,
-    "🌌 *USDT Galaxy*\n\nYour Galaxy account is ready.\n\n🚀 Tap below to open the Mini App.",
+    "🚀 *Welcome to USDT Galaxy!*\n\nTap below to open the Mini App.",
     {
       parse_mode: "Markdown",
 
@@ -235,6 +255,7 @@ async function handleStart(msg) {
 const server = http.createServer(
   (req, res) => {
 
+    // CORS
     res.setHeader(
       "Access-Control-Allow-Origin",
       "*"
@@ -257,11 +278,16 @@ const server = http.createServer(
       return;
     }
 
-    // HEALTH
+    // =========================
+    // HEALTH CHECK
+    // =========================
+
     if (
       req.method === "GET" &&
-      (req.url === "/" ||
-        req.url === "/health")
+      (
+        req.url === "/" ||
+        req.url === "/health"
+      )
     ) {
       res.writeHead(200, {
         "Content-Type":
@@ -299,17 +325,16 @@ const server = http.createServer(
           const update =
             JSON.parse(body);
 
+          // ONLY /start
           if (
             update.message &&
             update.message.text &&
             update.message.text
               .startsWith("/start")
           ) {
-
             await handleStart(
               update.message
             );
-
           }
 
           res.writeHead(200, {
@@ -330,7 +355,10 @@ const server = http.createServer(
             error
           );
 
-          res.writeHead(200);
+          res.writeHead(200, {
+            "Content-Type":
+              "application/json"
+          });
 
           res.end(
             JSON.stringify({
@@ -431,7 +459,8 @@ const server = http.createServer(
           res.end(
             JSON.stringify({
               success: false,
-              error: "SERVER_ERROR"
+              error:
+                "SERVER_ERROR"
             })
           );
         }
@@ -506,7 +535,8 @@ const server = http.createServer(
             res.end(
               JSON.stringify({
                 success: false,
-                error: "INVALID_TASK"
+                error:
+                  "INVALID_TASK"
               })
             );
 
@@ -610,6 +640,14 @@ server.listen(
 
     try {
 
+      // Remove old webhook first
+      await bot.deleteWebHook();
+
+      console.log(
+        "🧹 Old webhook removed"
+      );
+
+      // Set fresh webhook
       const webhookUrl =
         `${BACKEND_URL}/bot${BOT_TOKEN}`;
 
