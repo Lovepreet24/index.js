@@ -2,21 +2,21 @@ const TelegramBot = require('node-telegram-bot-api');
 const http = require('http');
 const mongoose = require('mongoose');
 
-// 👇 Yahan aapka MongoDB Database Link set hai 👇
+// Aapka MongoDB Database Link
 const mongoURI = 'mongodb+srv://bhullar241:Lovepreet241@bhullar.jjzhl1x.mongodb.net/galaxybot?retryWrites=true&w=majority&appName=Bhullar';
 
 mongoose.connect(mongoURI)
     .then(() => console.log('✅ MongoDB Connected! Database is Live.'))
     .catch(err => console.error('❌ MongoDB Error:', err));
 
-// Database me Balance save karne ka structure
 const userSchema = new mongoose.Schema({
     userId: { type: String, required: true, unique: true },
     balance: { type: Number, default: 500 }
 });
 const User = mongoose.model('User', userSchema);
 
-const token = '8301838001:AAEKozR1IdOO07d8JRuWZ_BNZwd9GZaESZg';
+// 👇 Yahan aapka NAYA TOKEN set kar diya hai 👇
+const token = '8368559467:AAEdHKIhvI10PyiwsQnMTU1aoDq4ND-KQ4g';
 const webAppUrl = 'https://airdropnewmera.vercel.app/'; 
 const botUsername = 'USDTGalaxyProRobot'; 
 const paymentChannel = '@usdt_GalaxyPayments'; 
@@ -36,7 +36,6 @@ function getMainMenu(userId) {
     };
 }
 
-// Jab user /start karega, Database se balance check hoga
 bot.onText(/\/start(.*)/, async (msg) => {
     const chatId = msg.chat.id.toString();
     const userName = msg.from.first_name;
@@ -44,7 +43,7 @@ bot.onText(/\/start(.*)/, async (msg) => {
     try {
         let user = await User.findOne({ userId: chatId });
         if (!user) {
-            user = new User({ userId: chatId, balance: 500 }); // Naye user ko 500 denge
+            user = new User({ userId: chatId, balance: 500 }); 
             await user.save();
         }
         bot.sendMessage(chatId, `🚀 **Welcome to USDT Galaxy, ${userName}!**\n\nYour account is active. Use the terminal below to navigate your dashboard.`, { parse_mode: "Markdown", ...getMainMenu(chatId) });
@@ -53,7 +52,6 @@ bot.onText(/\/start(.*)/, async (msg) => {
     }
 });
 
-// Bot ke buttons ka system
 bot.on('message', async (msg) => {
     const chatId = msg.chat.id.toString();
     const text = msg.text;
@@ -79,7 +77,6 @@ bot.on('message', async (msg) => {
     }
 });
 
-// Auto-Sync API (Mini app se naya balance receive karke DB me save karna)
 const server = http.createServer((req, res) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -94,8 +91,6 @@ const server = http.createServer((req, res) => {
             try {
                 const data = JSON.parse(body);
                 if (data.userId && data.balance) {
-                    
-                    // Database me balance update ho raha hai
                     await User.findOneAndUpdate(
                         { userId: data.userId.toString() },
                         { balance: data.balance },
