@@ -19,7 +19,6 @@ if (railwayUrl) {
         .catch(err => console.error('❌ Webhook error:', err));
 }
 
-// Supabase helper functions using native fetch
 async function getUser(chatId) {
     try {
         const res = await fetch(`${supabaseUrl}/rest/v1/users?chat_id=eq.${chatId}&select=*`, {
@@ -46,7 +45,7 @@ async function createUser(chatId) {
                 'Content-Type': 'application/json',
                 'Prefer': 'return=minimal'
             },
-            body: JSON.stringify({ chat_id: chatId, balance: 500 })
+            body: JSON.stringify({ chat_id: chatId.toString(), balance: 500 })
         });
         return { balance: 500 };
     } catch (e) {
@@ -79,7 +78,6 @@ async function handleTelegramUpdate(msg) {
     const userName = msg.from.first_name || 'Commander';
 
     let user = await getUser(chatId);
-
     if (!user) {
         user = await createUser(chatId);
     }
