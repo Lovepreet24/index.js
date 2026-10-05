@@ -1,13 +1,12 @@
 {
   "name": "galaxy-bot",
-  "version": "1.0.0",
-  "description": "Telegram bot for Galaxy Earn",
+  "version": "2.0.0",
+  "description": "USDT Galaxy Telegram Bot",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
   },
   "dependencies": {
-    "node-telegram-bot-api": "^0.65.0",
-    "mongoose": "^8.0.0"
+    "node-telegram-bot-api": "^0.65.0"
   }
 }
