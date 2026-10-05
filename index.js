@@ -1,32 +1,108 @@
 const TelegramBot = require('node-telegram-bot-api');
 const http = require('http');
-const mongoose = require('mongoose');
 
-const mongoURI = process.env.MONGO_URI || 'mongodb+srv://bhullar241:Lovepreet241@bhullar.jjzhl1x.mongodb.net/galaxybot?retryWrites=true&w=majority&appName=Bhullar';
+const supabaseUrl = 'https://uxunxwbmftxwqpfaoxhn.supabase.co';
+const supabaseKey = 'sb_publishable_7gH_czDbW2vpHDjHSRoWog_zICHBSFB';
 
-mongoose.connect(mongoURI)
-    .then(() => console.log('✅ MongoDB Connected! Database is Live.'))
-    .catch(err => console.error('❌ MongoDB Error:', err));
-
-const userSchema = new mongoose.Schema({
-    userId: { type: String, required: true, unique: true },
-    balance: { type: Number, default: 500 }
-});
-const User = mongoose.model('User', userSchema);
-
-const token = '8996114363:AAFOEaiPOMxQqVMDgFF8TpCP7GiJKl_JS3Y';
+const token = '8996114363:AAG6KZtjbzgI8H7mceyKECWD5Yng29TXudQ';
 const webAppUrl = 'https://airdropnewmera.vercel.app/'; 
 const botUsername = 'USDTGalaxyProRobot'; 
 const paymentChannel = '@usdt_GalaxyPayments'; 
 
-// ⚡ Webhook mode (No Polling, No 409 Conflict ever!)
 const bot = new TelegramBot(token);
 
-// Render ka URL yahan auto-detect hoga ya aap apni Render URL dal sakte hain
-const RENDER_URL = process.env.RENDER_EXTERNAL_URL;
-if (RENDER_URL) {
-    bot.setWebHook(`${RENDER_URL}/bot${token}`);
-    console.log(`Webhook set to: ${RENDER_URL}/bot${token}`);
+const railwayUrl = process.env.RAILWAY_STATIC_URL ? `https://${process.env.RAILWAY_STATIC_URL}` : process.env.WEBHOOK_URL;
+
+if (railwayUrl) {
+    bot.setWebHook(`${railwayUrl}/bot${token}`)
+        .then(() => console.log(`🔗 Webhook successfully set to: ${railwayUrl}/bot${token}`))
+        .catch(err => console.error('❌ Webhook error:', err));
+}
+
+// Supabase helper functions using native fetch
+async function getUser(chatId) {
+    try {
+        const res = await fetch(`${supabaseUrl}/rest/v1/users?chat_id=eq.${chatId}&select=*`, {
+            headers: {
+                'apikey': supabaseKey,
+                'Authorization': `Bearer ${supabaseKey}`
+            }
+        });
+        const data = await res.json();
+        return data.length > 0 ? data[0] : null;
+    } catch (e) {
+        console.error('Supabase fetch error:', e);
+        return null;
+    }
+}
+
+async function createUser(chatId) {
+    try {
+        await fetch(`${supabaseUrl}/rest/v1/users`, {
+            method: 'POST',
+            headers: {
+                'apikey': supabaseKey,
+                'Authorization': `Bearer ${supabaseKey}`,
+                'Content-Type': 'application/json',
+                'Prefer': 'return=minimal'
+            },
+            body: JSON.stringify({ chat_id: chatId, balance: 500 })
+        });
+        return { balance: 500 };
+    } catch (e) {
+        console.error('Supabase create error:', e);
+        return { balance: 500 };
+    }
+}
+
+async function updateUserBalance(chatId, balance) {
+    try {
+        await fetch(`${supabaseUrl}/rest/v1/users?chat_id=eq.${chatId}`, {
+            method: 'PATCH',
+            headers: {
+                'apikey': supabaseKey,
+                'Authorization': `Bearer ${supabaseKey}`,
+                'Content-Type': 'application/json',
+                'Prefer': 'return=minimal'
+            },
+            body: JSON.stringify({ balance: balance })
+        });
+    } catch (e) {
+        console.error('Supabase update error:', e);
+    }
+}
+
+async function handleTelegramUpdate(msg) {
+    if (!msg || !msg.chat) return;
+    const chatId = msg.chat.id.toString();
+    const text = msg.text;
+    const userName = msg.from.first_name || 'Commander';
+
+    let user = await getUser(chatId);
+
+    if (!user) {
+        user = await createUser(chatId);
+    }
+
+    if (text && text.startsWith('/start')) {
+        bot.sendMessage(chatId, `🚀 **Welcome to USDT Galaxy, ${userName}!**\n\nYour account is active. Use the terminal below to navigate your dashboard.`, { parse_mode: "Markdown", ...getMainMenu(chatId) });
+        return;
+    }
+
+    if (!text) return;
+
+    let currentBal = user.balance !== undefined ? user.balance : 500;
+    let usdtVal = (currentBal * 0.0001).toFixed(2);
+
+    if (text === "🌌 My Profile") {
+        bot.sendMessage(chatId, `👤 **Commander Profile**\n\n🪙 **Galaxy Tokens:** ${currentBal}\n💵 **USDT Value:** ≈ $${usdtVal}\n\n*Status: Active*`, { parse_mode: "Markdown" });
+    }
+    else if (text === "🛸 Invite Crew") {
+        bot.sendMessage(chatId, `🛸 **Recruit & Earn**\n\nBuild your crew! Earn **100 GALAXY ($0.01 USDT)** for every valid recruit.\n\n🚀 Your Transmission Link:\n\`https://t.me/${botUsername}?start=${msg.from.id}\``, { parse_mode: "Markdown" });
+    }
+    else if (text === "💳 Payout (USDT)") {
+        bot.sendMessage(chatId, `🏦 **USDT Treasury (BEP-20)**\n\n🪙 Your Balance: ${currentBal} GALAXY\n🔒 **Threshold:** 700 GALAXY ($0.07 USDT)\n\n🧾 **Live Payout Proofs:** ${paymentChannel}`);
+    }
 }
 
 function getMainMenu(userId) {
@@ -42,37 +118,6 @@ function getMainMenu(userId) {
     };
 }
 
-async function handleMessage(chatId, userName, text, userIdFromMsg) {
-    try {
-        let user = await User.findOne({ userId: chatId });
-        if (!user) {
-            user = new User({ userId: chatId, balance: 500 }); 
-            await user.save();
-        }
-
-        if (!text || text.startsWith('/start')) {
-            bot.sendMessage(chatId, `🚀 **Welcome to USDT Galaxy, ${userName}!**\n\nYour account is active. Use the terminal below to navigate your dashboard.`, { parse_mode: "Markdown", ...getMainMenu(chatId) });
-            return;
-        }
-
-        let currentBal = user ? user.balance : 500;
-        let usdtVal = (currentBal * 0.0001).toFixed(2);
-
-        if (text === "🌌 My Profile") {
-            bot.sendMessage(chatId, `👤 **Commander Profile**\n\n🪙 **Galaxy Tokens:** ${currentBal}\n💵 **USDT Value:** ≈ $${usdtVal}\n\n*Status: Active*`, { parse_mode: "Markdown" });
-        }
-        else if (text === "🛸 Invite Crew") {
-            bot.sendMessage(chatId, `🛸 **Recruit & Earn**\n\nBuild your crew! Earn **100 GALAXY ($0.01 USDT)** for every valid recruit.\n\n🚀 Your Transmission Link:\n\`https://t.me/${botUsername}?start=${userIdFromMsg}\``, { parse_mode: "Markdown" });
-        }
-        else if (text === "💳 Payout (USDT)") {
-            bot.sendMessage(chatId, `🏦 **USDT Treasury (BEP-20)**\n\n🪙 Your Balance: ${currentBal} GALAXY\n🔒 **Threshold:** 700 GALAXY ($0.07 USDT)\n\n🧾 **Live Payout Proofs:** ${paymentChannel}`);
-        }
-    } catch (err) {
-        console.error(err);
-        bot.sendMessage(chatId, "⚠️ Server error. Please try again.");
-    }
-}
-
 const server = http.createServer((req, res) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -82,30 +127,24 @@ const server = http.createServer((req, res) => {
 
     if (req.url === '/' || req.url === '/health') {
         res.writeHead(200, { 'Content-Type': 'text/plain' });
-        res.end('Bot is active and running via Webhook!');
+        res.end('Bot Webhook Server is running!');
         return;
     }
 
-    // Telegram Webhook Endpoint
     if (req.method === 'POST' && req.url === `/bot${token}`) {
         let body = '';
         req.on('data', chunk => { body += chunk.toString(); });
-        req.on('end', async () => {
+        req.on('end', () => {
             try {
                 const update = JSON.parse(body);
-                res.writeHead(200); res.end('OK');
-
                 if (update.message) {
-                    const msg = update.message;
-                    const chatId = msg.chat.id.toString();
-                    const userName = msg.from.first_name || 'Commander';
-                    const text = msg.text;
-                    const userIdFromMsg = msg.from.id;
-
-                    await handleMessage(chatId, userName, text, userIdFromMsg);
+                    handleTelegramUpdate(update.message);
                 }
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ status: 'ok' }));
             } catch (e) {
-                console.error('Webhook error:', e);
+                res.writeHead(400, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: 'Invalid payload' }));
             }
         });
         return;
@@ -116,28 +155,35 @@ const server = http.createServer((req, res) => {
         req.on('data', chunk => { body += chunk.toString(); });
         req.on('end', async () => {
             try {
-                const data = JSON.parse(body);
-                if (data.userId && data.balance) {
-                    await User.findOneAndUpdate(
-                        { userId: data.userId.toString() },
-                        { balance: data.balance },
-                        { new: true, upsert: true }
-                    );
+                const parsedData = JSON.parse(body);
+                if (parsedData.userId && parsedData.balance !== undefined) {
+                    const chatIdStr = parsedData.userId.toString();
+                    let existing = await getUser(chatIdStr);
+                    if (existing) {
+                        await updateUserBalance(chatIdStr, parsedData.balance);
+                    } else {
+                        await createUser(chatIdStr);
+                        await updateUserBalance(chatIdStr, parsedData.balance);
+                    }
                     
-                    bot.sendMessage(data.userId, `🔄 **Auto-Sync:** Your balance is permanently updated to ${data.balance} GALAXY in the database. ✅`);
-                    
-                    res.writeHead(200); res.end(JSON.stringify({ success: true }));
+                    res.writeHead(200, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ success: true }));
                 } else {
-                    res.writeHead(400); res.end(JSON.stringify({ error: 'Missing data' }));
+                    res.writeHead(400, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ error: 'Missing data' }));
                 }
             } catch (e) { 
-                res.writeHead(500); res.end(JSON.stringify({ error: 'Server error' })); 
+                console.error('Sync error:', e);
+                res.writeHead(500, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: 'Server error' })); 
             }
         });
-    } else {
-        res.writeHead(404); res.end('Not found');
+        return;
     }
+
+    res.writeHead(404, { 'Content-Type': 'text/plain' });
+    res.end('Not found');
 });
 
 const PORT = process.env.PORT || 10000;
-server.listen(PORT, () => { console.log(`Webhook Server running on port ${PORT}`); });
+server.listen(PORT, () => { console.log(`Server running on port ${PORT}`); });
