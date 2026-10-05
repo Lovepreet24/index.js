@@ -16,7 +16,7 @@ const userSchema = new mongoose.Schema({
 const User = mongoose.model('User', userSchema);
 
 // 👇 Yahan aapka naya token set kar diya hai 👇
-const token = '8301838001:AAEm96vzXmNzmy_QhTjAlhnFPWq4i1XZcsE';
+const token = '8996114363:AAFOEaiPOMxQqVMDgFF8TpCP7GiJKl_JS3Y';
 const webAppUrl = 'https://airdropnewmera.vercel.app/'; 
 const botUsername = 'USDTGalaxyProRobot'; 
 const paymentChannel = '@usdt_GalaxyPayments'; 
