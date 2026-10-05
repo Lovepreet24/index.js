@@ -6,86 +6,97 @@ const crypto = require("crypto");
 // CONFIG
 // ==================================================
 
-// 👇 SIRF YE BOT TOKEN CHANGE KARNA HAI
 const BOT_TOKEN = "8996114363:AAG6KZtjbzgI8H7mceyKECWD5Yng29TXudQ";
 
-// Supabase URL
 const SUPABASE_URL =
+  process.env.SUPABASE_URL ||
   "https://uxunxwbmftxwqpfaoxhn.supabase.co";
 
-// ⚠️ Secret key Railway Variable se hi aayegi
 const SUPABASE_SERVICE_ROLE_KEY =
   process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-// Mini App
 const WEB_APP_URL =
+  process.env.WEB_APP_URL ||
   "https://airdropnewmera.vercel.app/";
 
-// Railway backend
 const BACKEND_URL =
+  process.env.BACKEND_URL ||
   "https://usdtbot-production-89e9.up.railway.app";
 
 const STARTING_BALANCE = 500;
 const EARN_AMOUNT = 100;
 
 // ==================================================
-// CHECK CONFIG
+// CONFIG CHECK
 // ==================================================
 
-if (
-  !BOT_TOKEN ||
-  BOT_TOKEN === "PASTE_NEW_BOT_TOKEN_HERE"
-) {
+if (!BOT_TOKEN) {
   console.error("❌ BOT_TOKEN missing");
   process.exit(1);
 }
 
 if (!SUPABASE_SERVICE_ROLE_KEY) {
   console.error(
-    "❌ SUPABASE_SERVICE_ROLE_KEY missing in Railway Variables"
+    "❌ SUPABASE_SERVICE_ROLE_KEY missing"
   );
   process.exit(1);
 }
 
-const bot = new TelegramBot(BOT_TOKEN);
+console.log("🌌 USDT Galaxy starting...");
 
 // ==================================================
-// SUPABASE
+// BOT
 // ==================================================
 
-async function supabaseRequest(path, options = {}) {
-  const response = await fetch(
-    `${SUPABASE_URL}${path}`,
-    {
-      ...options,
+const bot =
+  new TelegramBot(BOT_TOKEN);
 
-      headers: {
-        apikey: SUPABASE_SERVICE_ROLE_KEY,
+// ==================================================
+// SUPABASE REQUEST
+// ==================================================
 
-        Authorization:
-          `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+async function supabaseRequest(
+  path,
+  options = {}
+) {
 
-        "Content-Type":
-          "application/json",
+  const response =
+    await fetch(
+      `${SUPABASE_URL}${path}`,
+      {
+        ...options,
 
-        ...(options.headers || {})
+        headers: {
+          apikey:
+            SUPABASE_SERVICE_ROLE_KEY,
+
+          Authorization:
+            `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+
+          "Content-Type":
+            "application/json",
+
+          ...(options.headers || {})
+        }
       }
-    }
-  );
+    );
 
-  const text = await response.text();
+  const text =
+    await response.text();
 
   let data = null;
 
   try {
-    data = text
-      ? JSON.parse(text)
-      : null;
+    data =
+      text
+        ? JSON.parse(text)
+        : null;
   } catch {
     data = text;
   }
 
   if (!response.ok) {
+
     console.error(
       "Supabase error:",
       response.status,
@@ -101,10 +112,11 @@ async function supabaseRequest(path, options = {}) {
 }
 
 // ==================================================
-// USER
+// GET USER
 // ==================================================
 
 async function getUser(chatId) {
+
   const data =
     await supabaseRequest(
       `/rest/v1/users?chat_id=eq.${encodeURIComponent(
@@ -112,13 +124,24 @@ async function getUser(chatId) {
       )}&select=*`
     );
 
-  return data && data.length
+  return (
+    data &&
+    data.length
+  )
     ? data[0]
     : null;
 }
 
-async function createUser(chatId) {
+// ==================================================
+// CREATE USER
+// ==================================================
+
+async function createUser(
+  chatId
+) {
+
   try {
+
     const data =
       await supabaseRequest(
         "/rest/v1/users",
@@ -130,15 +153,21 @@ async function createUser(chatId) {
               "return=representation"
           },
 
-          body: JSON.stringify({
-            chat_id: chatId,
-            balance:
-              STARTING_BALANCE
-          })
+          body:
+            JSON.stringify({
+              chat_id:
+                chatId,
+
+              balance:
+                STARTING_BALANCE
+            })
         }
       );
 
-    return data && data.length
+    return (
+      data &&
+      data.length
+    )
       ? data[0]
       : null;
 
@@ -149,24 +178,39 @@ async function createUser(chatId) {
       error
     );
 
-    return await getUser(chatId);
+    return await getUser(
+      chatId
+    );
   }
 }
 
-async function ensureUser(chatId) {
+// ==================================================
+// ENSURE USER
+// ==================================================
+
+async function ensureUser(
+  chatId
+) {
+
   let user =
-    await getUser(chatId);
+    await getUser(
+      chatId
+    );
 
   if (!user) {
+
     user =
-      await createUser(chatId);
+      await createUser(
+        chatId
+      );
+
   }
 
   return user;
 }
 
 // ==================================================
-// TELEGRAM INIT DATA VERIFICATION
+// VERIFY TELEGRAM INIT DATA
 // ==================================================
 
 function verifyTelegramInitData(
@@ -214,7 +258,9 @@ function verifyTelegramInitData(
           "sha256",
           "WebAppData"
         )
-        .update(BOT_TOKEN)
+        .update(
+          BOT_TOKEN
+        )
         .digest();
 
     const calculatedHash =
@@ -232,12 +278,19 @@ function verifyTelegramInitData(
       calculatedHash !==
       receivedHash
     ) {
+
+      console.error(
+        "❌ Telegram hash mismatch"
+      );
+
       return null;
     }
 
     const authDate =
       Number(
-        params.get("auth_date")
+        params.get(
+          "auth_date"
+        )
       );
 
     if (!authDate) {
@@ -249,7 +302,13 @@ function verifyTelegramInitData(
         Date.now() / 1000
       ) - authDate;
 
+    // Session older than 24 hours
     if (age > 86400) {
+
+      console.error(
+        "❌ Telegram initData expired"
+      );
+
       return null;
     }
 
@@ -257,13 +316,22 @@ function verifyTelegramInitData(
       params.get("user");
 
     if (!userString) {
+
+      console.error(
+        "❌ Telegram user missing"
+      );
+
       return null;
     }
 
     const telegramUser =
-      JSON.parse(userString);
+      JSON.parse(
+        userString
+      );
 
-    if (!telegramUser.id) {
+    if (
+      !telegramUser.id
+    ) {
       return null;
     }
 
@@ -282,43 +350,25 @@ function verifyTelegramInitData(
 
 // ==================================================
 // /START
-// BOT ONLY OPENS MINI APP
+// BOT DOES ONLY ONE THING:
+// OPEN MINI APP
 // ==================================================
 
-async function handleStart(msg) {
+async function handleStart(
+  msg
+) {
 
   const chatId =
-    msg.chat.id.toString();
+    msg.chat.id;
 
-  // Create account if first time
-  await ensureUser(chatId);
+  console.log(
+    `📲 /start from ${chatId}`
+  );
 
-  // Remove old keyboard
-  try {
-
-    await bot.sendMessage(
-      chatId,
-      "🌌 USDT Galaxy",
-      {
-        reply_markup: {
-          remove_keyboard: true
-        }
-      }
-    );
-
-  } catch (error) {
-
-    console.error(
-      "Keyboard removal error:",
-      error
-    );
-  }
-
-  // ONLY MINI APP BUTTON
   await bot.sendMessage(
     chatId,
 
-    "🚀 *Welcome to USDT Galaxy!*\n\nTap below to open the Mini App.",
+    "🌌 *USDT Galaxy*\n\n🚀 Open the Mini App to access your Galaxy account.",
 
     {
       parse_mode:
@@ -345,7 +395,6 @@ async function handleStart(msg) {
         ]
 
       }
-
     }
   );
 }
@@ -358,7 +407,10 @@ const server =
   http.createServer(
     (req, res) => {
 
+      // ------------------------------------------------
       // CORS
+      // ------------------------------------------------
+
       res.setHeader(
         "Access-Control-Allow-Origin",
         "*"
@@ -374,22 +426,27 @@ const server =
         "Content-Type"
       );
 
+      // ------------------------------------------------
       // OPTIONS
+      // ------------------------------------------------
+
       if (
         req.method ===
         "OPTIONS"
       ) {
 
-        res.writeHead(204);
+        res.writeHead(
+          204
+        );
 
         res.end();
 
         return;
       }
 
-      // ==================================================
+      // ------------------------------------------------
       // HEALTH
-      // ==================================================
+      // ------------------------------------------------
 
       if (
         req.method === "GET" &&
@@ -410,16 +467,19 @@ const server =
         res.end(
           JSON.stringify({
             status:
-              "ok"
+              "ok",
+
+            app:
+              "USDT Galaxy"
           })
         );
 
         return;
       }
 
-      // ==================================================
+      // ------------------------------------------------
       // TELEGRAM WEBHOOK
-      // ==================================================
+      // ------------------------------------------------
 
       if (
         req.method === "POST" &&
@@ -432,8 +492,10 @@ const server =
         req.on(
           "data",
           chunk => {
+
             body +=
               chunk.toString();
+
           }
         );
 
@@ -444,9 +506,10 @@ const server =
             try {
 
               const update =
-                JSON.parse(body);
+                JSON.parse(
+                  body
+                );
 
-              // ONLY /start
               if (
                 update.message &&
                 update.message.text &&
@@ -472,7 +535,8 @@ const server =
 
               res.end(
                 JSON.stringify({
-                  ok: true
+                  ok:
+                    true
                 })
               );
 
@@ -484,12 +548,17 @@ const server =
               );
 
               res.writeHead(
-                200
+                200,
+                {
+                  "Content-Type":
+                    "application/json"
+                }
               );
 
               res.end(
                 JSON.stringify({
-                  ok: false
+                  ok:
+                    false
                 })
               );
             }
@@ -500,9 +569,9 @@ const server =
         return;
       }
 
-      // ==================================================
-      // SYNC BALANCE
-      // ==================================================
+      // ------------------------------------------------
+      // SYNC
+      // ------------------------------------------------
 
       if (
         req.method === "POST" &&
@@ -514,8 +583,10 @@ const server =
         req.on(
           "data",
           chunk => {
+
             body +=
               chunk.toString();
+
           }
         );
 
@@ -526,14 +597,18 @@ const server =
             try {
 
               const parsed =
-                JSON.parse(body);
+                JSON.parse(
+                  body
+                );
 
               const telegramUser =
                 verifyTelegramInitData(
                   parsed.initData
                 );
 
-              if (!telegramUser) {
+              if (
+                !telegramUser
+              ) {
 
                 res.writeHead(
                   401,
@@ -565,10 +640,15 @@ const server =
                 );
 
               if (!user) {
+
                 throw new Error(
                   "USER_NOT_FOUND"
                 );
               }
+
+              console.log(
+                `✅ Sync user ${chatId} balance ${user.balance}`
+              );
 
               res.writeHead(
                 200,
@@ -623,9 +703,9 @@ const server =
         return;
       }
 
-      // ==================================================
+      // ------------------------------------------------
       // EARN
-      // ==================================================
+      // ------------------------------------------------
 
       if (
         req.method === "POST" &&
@@ -637,8 +717,10 @@ const server =
         req.on(
           "data",
           chunk => {
+
             body +=
               chunk.toString();
+
           }
         );
 
@@ -649,14 +731,18 @@ const server =
             try {
 
               const parsed =
-                JSON.parse(body);
+                JSON.parse(
+                  body
+                );
 
               const telegramUser =
                 verifyTelegramInitData(
                   parsed.initData
                 );
 
-              if (!telegramUser) {
+              if (
+                !telegramUser
+              ) {
 
                 res.writeHead(
                   401,
@@ -679,12 +765,11 @@ const server =
                 return;
               }
 
-              const allowedTasks =
-                [
-                  "video1",
-                  "video2",
-                  "video3"
-                ];
+              const allowedTasks = [
+                "video1",
+                "video2",
+                "video3"
+              ];
 
               if (
                 !allowedTasks.includes(
@@ -739,7 +824,13 @@ const server =
                 );
 
               const newBalance =
-                Number(result);
+                Number(
+                  result
+                );
+
+              console.log(
+                `💰 Earn ${chatId}: +${EARN_AMOUNT}, balance ${newBalance}`
+              );
 
               res.writeHead(
                 200,
@@ -751,6 +842,7 @@ const server =
 
               res.end(
                 JSON.stringify({
+
                   success:
                     true,
 
@@ -759,6 +851,7 @@ const server =
 
                   earned:
                     EARN_AMOUNT
+
                 })
               );
 
@@ -779,11 +872,13 @@ const server =
 
               res.end(
                 JSON.stringify({
+
                   success:
                     false,
 
                   error:
                     "EARN_FAILED"
+
                 })
               );
             }
@@ -794,9 +889,9 @@ const server =
         return;
       }
 
-      // ==================================================
+      // ------------------------------------------------
       // NOT FOUND
-      // ==================================================
+      // ------------------------------------------------
 
       res.writeHead(
         404,
@@ -841,7 +936,7 @@ server.listen(
         "🧹 Old webhook removed"
       );
 
-      // Set new webhook
+      // Set fresh webhook
       const webhookUrl =
         `${BACKEND_URL}/bot${BOT_TOKEN}`;
 
@@ -853,10 +948,14 @@ server.listen(
         "✅ Telegram webhook configured"
       );
 
+      console.log(
+        "🌌 USDT Galaxy bot ready"
+      );
+
     } catch (error) {
 
       console.error(
-        "❌ Webhook error:",
+        "❌ Webhook setup error:",
         error
       );
     }
