@@ -15,9 +15,13 @@ const SUPABASE_URL =
 const SUPABASE_SERVICE_ROLE_KEY =
   process.env.SUPABASE_SERVICE_ROLE_KEY;
 
+// ==================================================
+// WEB APP
+// ==================================================
+
+// Current Galaxy Token Mini App URL
 const WEB_APP_URL =
-  process.env.WEB_APP_URL ||
-  "https://airdropnewmera.vercel.app/";
+  "https://usdtgalaxypro.vercel.app/";
 
 const BACKEND_URL =
   process.env.BACKEND_URL ||
@@ -33,9 +37,14 @@ const ADMIN_SECRET =
 // ==================================================
 
 const STARTING_BALANCE = 500; // 500 GALAXY = $0.05 USDT
+
 const REFERRAL_REWARD = 100;  // 100 GALAXY = $0.01 USDT
-const EARN_AMOUNT = 100;      // 100 GALAXY = $0.01 USDT
-const MIN_WITHDRAWAL = 700;   // 700 GALAXY = $0.07 USDT
+
+const EARN_AMOUNT = 50;       // 50 GALAXY = $0.005 USDT
+
+const MIN_WITHDRAWAL = 500;   // 500 GALAXY = $0.05 USDT
+
+const GALAXY_PER_USDT = 10000;
 
 const TASK_COOLDOWN_MS =
   24 * 60 * 60 * 1000;
@@ -44,8 +53,11 @@ const TASK_COOLDOWN_MS =
 // TELEGRAM CHANNELS
 // ==================================================
 
-const MAIN_CHANNEL = "@USDTGalaxyOfficial";
-const PAYMENT_CHANNEL = "@usdt_GalaxyPayments";
+const MAIN_CHANNEL =
+  "@USDTGalaxyOfficial";
+
+const PAYMENT_CHANNEL =
+  "@usdt_GalaxyPayments";
 
 // ==================================================
 // YOUTUBE TASKS
@@ -57,11 +69,13 @@ const YOUTUBE_TASKS = [
     url: "https://youtu.be/unTAEBvggus",
     reward: EARN_AMOUNT
   },
+
   {
     id: "video2",
     url: "https://youtu.be/Hja_iwEkfmI",
     reward: EARN_AMOUNT
   },
+
   {
     id: "video3",
     url: "https://youtu.be/I5mLBbsuAdA",
@@ -79,7 +93,10 @@ if (!BOT_TOKEN) {
 }
 
 if (!SUPABASE_SERVICE_ROLE_KEY) {
-  console.error("❌ SUPABASE_SERVICE_ROLE_KEY missing");
+  console.error(
+    "❌ SUPABASE_SERVICE_ROLE_KEY missing"
+  );
+
   process.exit(1);
 }
 
@@ -89,37 +106,45 @@ if (!ADMIN_SECRET) {
   );
 }
 
-console.log("🌌 USDT Galaxy starting...");
+console.log(
+  "🌌 Galaxy Token starting..."
+);
 
 // ==================================================
 // BOT
 // ==================================================
 
-const bot = new TelegramBot(BOT_TOKEN);
+const bot =
+  new TelegramBot(BOT_TOKEN);
 
 // ==================================================
 // SUPABASE REQUEST
 // ==================================================
 
-async function supabaseRequest(path, options = {}) {
-  const response = await fetch(
-    `${SUPABASE_URL}${path}`,
-    {
-      ...options,
+async function supabaseRequest(
+  path,
+  options = {}
+) {
+  const response =
+    await fetch(
+      `${SUPABASE_URL}${path}`,
+      {
+        ...options,
 
-      headers: {
-        apikey: SUPABASE_SERVICE_ROLE_KEY,
+        headers: {
+          apikey:
+            SUPABASE_SERVICE_ROLE_KEY,
 
-        Authorization:
-          `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+          Authorization:
+            `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
 
-        "Content-Type":
-          "application/json",
+          "Content-Type":
+            "application/json",
 
-        ...(options.headers || {})
+          ...(options.headers || {})
+        }
       }
-    }
-  );
+    );
 
   const text =
     await response.text();
@@ -185,13 +210,16 @@ async function registerUser(
         {
           method: "POST",
 
-          body: JSON.stringify({
-            p_chat_id: chatId,
-            p_referrer_id:
-              referrerId
-                ? String(referrerId)
-                : null
-          })
+          body:
+            JSON.stringify({
+              p_chat_id:
+                chatId,
+
+              p_referrer_id:
+                referrerId
+                  ? String(referrerId)
+                  : null
+            })
         }
       );
 
@@ -210,8 +238,11 @@ async function registerUser(
       error
     );
 
-    // If already exists, simply return existing user.
-    return await getUser(chatId);
+    // If already exists,
+    // simply return existing user.
+    return await getUser(
+      chatId
+    );
   }
 }
 
@@ -219,7 +250,9 @@ async function registerUser(
 // ENSURE USER
 // ==================================================
 
-async function ensureUser(chatId) {
+async function ensureUser(
+  chatId
+) {
   let user =
     await getUser(chatId);
 
@@ -352,7 +385,9 @@ function verifyTelegramInitData(
     }
 
     const telegramUser =
-      JSON.parse(userString);
+      JSON.parse(
+        userString
+      );
 
     if (!telegramUser.id) {
       console.error(
@@ -407,8 +442,10 @@ async function checkChannel(
 
     return {
       joined,
+
       status:
         status || "unknown",
+
       error: null
     };
 
@@ -420,7 +457,10 @@ async function checkChannel(
 
     return {
       joined: false,
-      status: "api_error",
+
+      status:
+        "api_error",
+
       error:
         error?.message ||
         "Telegram API error"
@@ -462,7 +502,9 @@ async function verifyChannels(
 // /START
 // ==================================================
 
-async function handleStart(msg) {
+async function handleStart(
+  msg
+) {
   const chatId =
     msg.chat.id.toString();
 
@@ -471,13 +513,17 @@ async function handleStart(msg) {
   );
 
   // /start REFERRER_ID
+
   const text =
     msg.text || "";
 
   const parts =
-    text.trim().split(/\s+/);
+    text
+      .trim()
+      .split(/\s+/);
 
-  let referrerId = null;
+  let referrerId =
+    null;
 
   if (
     parts.length >= 2 &&
@@ -489,7 +535,8 @@ async function handleStart(msg) {
     if (
       referrerId === chatId
     ) {
-      referrerId = null;
+      referrerId =
+        null;
     }
   }
 
@@ -497,6 +544,7 @@ async function handleStart(msg) {
     await getUser(chatId);
 
   if (!existingUser) {
+
     await registerUser(
       chatId,
       referrerId
@@ -511,7 +559,9 @@ async function handleStart(msg) {
         `👥 Referral candidate: ${referrerId}`
       );
     }
+
   } else {
+
     console.log(
       `👤 Existing user ${chatId}`
     );
@@ -520,17 +570,18 @@ async function handleStart(msg) {
   await bot.sendMessage(
     chatId,
 
-    "🌌 *USDT Galaxy*\n\n🚀 Open the Mini App to access your Galaxy account.",
+    "🌌 *Galaxy Token*\n\n🚀 Open the Mini App to access your Galaxy account.",
 
     {
-      parse_mode: "Markdown",
+      parse_mode:
+        "Markdown",
 
       reply_markup: {
         inline_keyboard: [
           [
             {
               text:
-                "🚀 Open USDT Galaxy",
+                "🚀 Open Galaxy Token",
 
               web_app: {
                 url:
@@ -548,9 +599,12 @@ async function handleStart(msg) {
 // READ HTTP BODY
 // ==================================================
 
-function readBody(req) {
+function readBody(
+  req
+) {
   return new Promise(
     (resolve, reject) => {
+
       let body = "";
 
       req.on(
@@ -623,7 +677,10 @@ async function authenticate(
 
 const server =
   http.createServer(
-    async (req, res) => {
+    async (
+      req,
+      res
+    ) => {
 
       // ------------------------------------------------
       // CORS
@@ -670,12 +727,16 @@ const server =
             req.url === "/health"
           )
         ) {
+
           sendJson(
             res,
             200,
             {
-              status: "ok",
-              app: "USDT Galaxy"
+              status:
+                "ok",
+
+              app:
+                "Galaxy Token"
             }
           );
 
@@ -696,6 +757,7 @@ const server =
             await readBody(req);
 
           try {
+
             const update =
               JSON.parse(body);
 
@@ -706,12 +768,14 @@ const server =
                 "/start"
               )
             ) {
+
               await handleStart(
                 update.message
               );
             }
 
           } catch (error) {
+
             console.error(
               "Webhook processing error:",
               error
@@ -745,14 +809,19 @@ const server =
           let parsed;
 
           try {
+
             parsed =
               JSON.parse(body);
+
           } catch {
+
             sendJson(
               res,
               400,
               {
-                success: false,
+                success:
+                  false,
+
                 error:
                   "INVALID_JSON"
               }
@@ -767,11 +836,14 @@ const server =
             );
 
           if (!telegramUser) {
+
             sendJson(
               res,
               401,
               {
-                success: false,
+                success:
+                  false,
+
                 error:
                   "INVALID_TELEGRAM_SESSION"
               }
@@ -792,7 +864,8 @@ const server =
             res,
             200,
             {
-              success: true,
+              success:
+                true,
 
               joined:
                 result.joined,
@@ -839,14 +912,19 @@ const server =
           let parsed;
 
           try {
+
             parsed =
               JSON.parse(body);
+
           } catch {
+
             sendJson(
               res,
               400,
               {
-                success: false,
+                success:
+                  false,
+
                 error:
                   "INVALID_JSON"
               }
@@ -861,11 +939,14 @@ const server =
             );
 
           if (!telegramUser) {
+
             sendJson(
               res,
               401,
               {
-                success: false,
+                success:
+                  false,
+
                 error:
                   "INVALID_TELEGRAM_SESSION"
               }
@@ -889,6 +970,7 @@ const server =
           }
 
           // Get task cooldown information
+
           const claims =
             await supabaseRequest(
               `/rest/v1/task_claims?chat_id=eq.${encodeURIComponent(
@@ -912,11 +994,19 @@ const server =
                       )
                     : null;
 
-                let available = true;
-                let nextAvailableAt = null;
-                let remainingSeconds = 0;
+                let available =
+                  true;
 
-                if (claim?.claimed_at) {
+                let nextAvailableAt =
+                  null;
+
+                let remainingSeconds =
+                  0;
+
+                if (
+                  claim?.claimed_at
+                ) {
+
                   const claimedTime =
                     new Date(
                       claim.claimed_at
@@ -930,7 +1020,10 @@ const server =
                     now <
                     nextTime
                   ) {
-                    available = false;
+
+                    available =
+                      false;
+
                     nextAvailableAt =
                       new Date(
                         nextTime
@@ -958,7 +1051,7 @@ const server =
 
                   usdt:
                     task.reward /
-                    10000,
+                    GALAXY_PER_USDT,
 
                   available,
 
@@ -973,7 +1066,8 @@ const server =
             res,
             200,
             {
-              success: true,
+              success:
+                true,
 
               balance:
                 Number(
@@ -991,21 +1085,21 @@ const server =
 
               referralRewardUsdt:
                 REFERRAL_REWARD /
-                10000,
+                GALAXY_PER_USDT,
 
               joiningBonus:
                 STARTING_BALANCE,
 
               joiningBonusUsdt:
                 STARTING_BALANCE /
-                10000,
+                GALAXY_PER_USDT,
 
               minWithdrawal:
                 MIN_WITHDRAWAL,
 
               minWithdrawalUsdt:
                 MIN_WITHDRAWAL /
-                10000,
+                GALAXY_PER_USDT,
 
               tasks
             }
@@ -1030,14 +1124,19 @@ const server =
           let parsed;
 
           try {
+
             parsed =
               JSON.parse(body);
+
           } catch {
+
             sendJson(
               res,
               400,
               {
-                success: false,
+                success:
+                  false,
+
                 error:
                   "INVALID_JSON"
               }
@@ -1052,11 +1151,14 @@ const server =
             );
 
           if (!telegramUser) {
+
             sendJson(
               res,
               401,
               {
-                success: false,
+                success:
+                  false,
+
                 error:
                   "INVALID_TELEGRAM_SESSION"
               }
@@ -1073,11 +1175,14 @@ const server =
             );
 
           if (!task) {
+
             sendJson(
               res,
               400,
               {
-                success: false,
+                success:
+                  false,
+
                 error:
                   "INVALID_TASK"
               }
@@ -1090,17 +1195,23 @@ const server =
             telegramUser.id.toString();
 
           // Check channels
+
           const channels =
             await verifyChannels(
               chatId
             );
 
-          if (!channels.joined) {
+          if (
+            !channels.joined
+          ) {
+
             sendJson(
               res,
               403,
               {
-                success: false,
+                success:
+                  false,
+
                 error:
                   "CHANNEL_JOIN_REQUIRED",
 
@@ -1120,11 +1231,13 @@ const server =
           );
 
           // Atomic 24-hour task claim
+
           const result =
             await supabaseRequest(
               "/rest/v1/rpc/claim_youtube_task",
               {
-                method: "POST",
+                method:
+                  "POST",
 
                 body:
                   JSON.stringify({
@@ -1154,7 +1267,8 @@ const server =
               res,
               429,
               {
-                success: false,
+                success:
+                  false,
 
                 error:
                   "TASK_COOLDOWN",
@@ -1181,7 +1295,8 @@ const server =
             res,
             200,
             {
-              success: true,
+              success:
+                true,
 
               balance:
                 Number(
@@ -1193,7 +1308,7 @@ const server =
 
               usdt:
                 task.reward /
-                10000,
+                GALAXY_PER_USDT,
 
               nextAvailableAt:
                 claimResult.next_available_at
@@ -1222,14 +1337,19 @@ const server =
           let parsed;
 
           try {
+
             parsed =
               JSON.parse(body);
+
           } catch {
+
             sendJson(
               res,
               400,
               {
-                success: false,
+                success:
+                  false,
+
                 error:
                   "INVALID_JSON"
               }
@@ -1244,11 +1364,14 @@ const server =
             );
 
           if (!telegramUser) {
+
             sendJson(
               res,
               401,
               {
-                success: false,
+                success:
+                  false,
+
                 error:
                   "INVALID_TELEGRAM_SESSION"
               }
@@ -1272,11 +1395,14 @@ const server =
               amount
             )
           ) {
+
             sendJson(
               res,
               400,
               {
-                success: false,
+                success:
+                  false,
+
                 error:
                   "INVALID_AMOUNT"
               }
@@ -1289,11 +1415,13 @@ const server =
             amount <
             MIN_WITHDRAWAL
           ) {
+
             sendJson(
               res,
               400,
               {
-                success: false,
+                success:
+                  false,
 
                 error:
                   "MIN_WITHDRAWAL",
@@ -1303,7 +1431,7 @@ const server =
 
                 minimumUsdt:
                   MIN_WITHDRAWAL /
-                  10000
+                  GALAXY_PER_USDT
               }
             );
 
@@ -1311,11 +1439,14 @@ const server =
           }
 
           if (!wallet) {
+
             sendJson(
               res,
               400,
               {
-                success: false,
+                success:
+                  false,
+
                 error:
                   "WALLET_REQUIRED"
               }
@@ -1328,11 +1459,14 @@ const server =
             wallet.length < 10 ||
             wallet.length > 150
           ) {
+
             sendJson(
               res,
               400,
               {
-                success: false,
+                success:
+                  false,
+
                 error:
                   "INVALID_WALLET"
               }
@@ -1348,7 +1482,8 @@ const server =
             await supabaseRequest(
               "/rest/v1/rpc/create_manual_payout",
               {
-                method: "POST",
+                method:
+                  "POST",
 
                 body:
                   JSON.stringify({
@@ -1373,21 +1508,18 @@ const server =
             !payout ||
             payout.success !== true
           ) {
+
             const errorCode =
               payout?.error ||
               "PAYOUT_FAILED";
 
-            const status =
-              errorCode ===
-              "INSUFFICIENT_BALANCE"
-                ? 400
-                : 400;
-
             sendJson(
               res,
-              status,
+              400,
               {
-                success: false,
+                success:
+                  false,
+
                 error:
                   errorCode
               }
@@ -1400,7 +1532,8 @@ const server =
             res,
             200,
             {
-              success: true,
+              success:
+                true,
 
               payoutId:
                 payout.payout_id,
@@ -1414,7 +1547,7 @@ const server =
 
               usdt:
                 amount /
-                10000,
+                GALAXY_PER_USDT,
 
               status:
                 "pending"
@@ -1443,14 +1576,19 @@ const server =
           let parsed;
 
           try {
+
             parsed =
               JSON.parse(body);
+
           } catch {
+
             sendJson(
               res,
               400,
               {
-                success: false,
+                success:
+                  false,
+
                 error:
                   "INVALID_JSON"
               }
@@ -1465,11 +1603,14 @@ const server =
             );
 
           if (!telegramUser) {
+
             sendJson(
               res,
               401,
               {
-                success: false,
+                success:
+                  false,
+
                 error:
                   "INVALID_TELEGRAM_SESSION"
               }
@@ -1492,26 +1633,37 @@ const server =
             res,
             200,
             {
-              success: true,
+              success:
+                true,
 
               payouts:
-                (payouts || []).map(
+                (
+                  payouts || []
+                ).map(
                   p => ({
-                    id: p.id,
+                    id:
+                      p.id,
+
                     amount:
                       Number(
                         p.amount
                       ),
+
                     usdt:
                       Number(
                         p.amount
-                      ) / 10000,
+                      ) /
+                      GALAXY_PER_USDT,
+
                     wallet:
                       p.wallet,
+
                     status:
                       p.status,
+
                     createdAt:
                       p.created_at,
+
                     processedAt:
                       p.processed_at
                   })
@@ -1525,7 +1677,6 @@ const server =
         // ==============================================
         // ADMIN PAYOUT STATUS
         //
-        // action:
         // paid     = mark paid
         // rejected = reject + refund balance
         // ==============================================
@@ -1535,14 +1686,15 @@ const server =
           req.url === "/admin/payout"
         ) {
 
-          if (
-            !ADMIN_SECRET
-          ) {
+          if (!ADMIN_SECRET) {
+
             sendJson(
               res,
               503,
               {
-                success: false,
+                success:
+                  false,
+
                 error:
                   "ADMIN_SECRET_NOT_CONFIGURED"
               }
@@ -1557,14 +1709,19 @@ const server =
           let parsed;
 
           try {
+
             parsed =
               JSON.parse(body);
+
           } catch {
+
             sendJson(
               res,
               400,
               {
-                success: false,
+                success:
+                  false,
+
                 error:
                   "INVALID_JSON"
               }
@@ -1577,11 +1734,14 @@ const server =
             parsed.adminSecret !==
             ADMIN_SECRET
           ) {
+
             sendJson(
               res,
               403,
               {
-                success: false,
+                success:
+                  false,
+
                 error:
                   "INVALID_ADMIN_SECRET"
               }
@@ -1607,11 +1767,14 @@ const server =
               "rejected"
             ].includes(action)
           ) {
+
             sendJson(
               res,
               400,
               {
-                success: false,
+                success:
+                  false,
+
                 error:
                   "INVALID_PAYOUT_ACTION"
               }
@@ -1624,7 +1787,8 @@ const server =
             await supabaseRequest(
               "/rest/v1/rpc/update_payout_status",
               {
-                method: "POST",
+                method:
+                  "POST",
 
                 body:
                   JSON.stringify({
@@ -1646,11 +1810,14 @@ const server =
             !output ||
             output.success !== true
           ) {
+
             sendJson(
               res,
               400,
               {
-                success: false,
+                success:
+                  false,
+
                 error:
                   output?.error ||
                   "PAYOUT_UPDATE_FAILED"
@@ -1664,7 +1831,8 @@ const server =
             res,
             200,
             {
-              success: true,
+              success:
+                true,
 
               payoutId,
 
@@ -1692,7 +1860,9 @@ const server =
           res,
           404,
           {
-            success: false,
+            success:
+              false,
+
             error:
               "NOT_FOUND"
           }
@@ -1709,7 +1879,9 @@ const server =
           res,
           500,
           {
-            success: false,
+            success:
+              false,
+
             error:
               "SERVER_ERROR"
           }
@@ -1754,6 +1926,10 @@ server.listen(
       );
 
       console.log(
+        `🌐 Web App URL: ${WEB_APP_URL}`
+      );
+
+      console.log(
         `📢 Main channel: ${MAIN_CHANNEL}`
       );
 
@@ -1764,21 +1940,28 @@ server.listen(
       console.log(
         `🎁 Joining bonus: ${STARTING_BALANCE} GALAXY ($${(
           STARTING_BALANCE /
-          10000
+          GALAXY_PER_USDT
         ).toFixed(2)} USDT)`
       );
 
       console.log(
         `👥 Referral reward: ${REFERRAL_REWARD} GALAXY ($${(
           REFERRAL_REWARD /
-          10000
+          GALAXY_PER_USDT
         ).toFixed(2)} USDT)`
+      );
+
+      console.log(
+        `▶️ YouTube task reward: ${EARN_AMOUNT} GALAXY ($${(
+          EARN_AMOUNT /
+          GALAXY_PER_USDT
+        ).toFixed(3)} USDT)`
       );
 
       console.log(
         `💸 Minimum withdrawal: ${MIN_WITHDRAWAL} GALAXY ($${(
           MIN_WITHDRAWAL /
-          10000
+          GALAXY_PER_USDT
         ).toFixed(2)} USDT)`
       );
 
@@ -1787,7 +1970,7 @@ server.listen(
       );
 
       console.log(
-        "🌌 USDT Galaxy bot ready"
+        "🌌 Galaxy Token bot ready"
       );
 
     } catch (error) {
